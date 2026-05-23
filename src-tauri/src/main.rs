@@ -49,6 +49,8 @@ struct Entry {
     source_path: String,
     #[serde(default)]
     name: String,
+    #[serde(default)]
+    source_child_kind: String,
 }
 
 fn default_entry_kind() -> String {
@@ -229,6 +231,7 @@ fn sanitize_config(config: Config) -> Config {
                 source_id: entry.source_id,
                 source_path: entry.source_path,
                 name: entry.name,
+                source_child_kind: entry.source_child_kind,
             })
         })
         .collect();
@@ -364,10 +367,15 @@ fn scan_directory_entries(source: &DirectorySource) -> Vec<Entry> {
                 return None;
             }
             let path = child.path();
-            let name = path
-                .file_stem()
-                .map(|value| value.to_string_lossy().to_string())
-                .unwrap_or(file_name);
+            let is_file = path.is_file();
+            let source_child_kind = if is_file { "file" } else { "folder" }.to_string();
+            let name = if is_file {
+                file_name
+            } else {
+                path.file_stem()
+                    .map(|value| value.to_string_lossy().to_string())
+                    .unwrap_or(file_name)
+            };
             let value = fs::canonicalize(&path)
                 .unwrap_or(path)
                 .to_string_lossy()
@@ -379,6 +387,7 @@ fn scan_directory_entries(source: &DirectorySource) -> Vec<Entry> {
                 source_id: source.id.clone(),
                 source_path: source.path.clone(),
                 name,
+                source_child_kind,
             })
         })
         .collect()
@@ -1184,7 +1193,9 @@ mod tests {
             .iter()
             .map(|entry| entry.key.clone())
             .collect();
-        assert_eq!(keys, vec!["codex:note", "codex:skill-a"]);
+        assert_eq!(keys, vec!["codex:note.md", "codex:skill-a"]);
+        assert_eq!(config.entries[0].source_child_kind, "file");
+        assert_eq!(config.entries[1].source_child_kind, "folder");
     }
 
     #[test]
@@ -1242,6 +1253,7 @@ mod tests {
                 source_id: String::new(),
                 source_path: String::new(),
                 name: String::new(),
+                source_child_kind: String::new(),
             }],
             ..Config::default()
         };

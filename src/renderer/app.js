@@ -198,6 +198,7 @@ function highlight(text, regex) {
 }
 
 function resolveEntryIcon(entry) {
+  if (entry.kind === 'directory' && entry.sourceChildKind === 'file') return 'file';
   return entry.kind === 'directory' ? 'folder' : 'direct';
 }
 
@@ -452,11 +453,10 @@ function renderSourceGroups() {
       : filter
         ? `${group.path} · ${visibleSnippets.length} of ${totalCount} match`
         : `${group.path} · ${totalCount} snippet${totalCount === 1 ? '' : 's'}`;
-    const iconId = 'folder';
     wrapper.innerHTML = `
       <header class="source-header">
         <button class="chev" data-action="toggle-source" data-id="${escapeAttr(group.id)}" title="Toggle">▾</button>
-        <span class="source-glyph">${iconSvg(iconId)}</span>
+        <span class="source-glyph">${iconSvg('folder')}</span>
         <div class="source-info">
           <input class="prefix-input" data-action="source-prefix" data-id="${escapeAttr(group.id)}" value="${escapeAttr(group.lastPrefix || '')}" placeholder="prefix:" title="Edit prefix">
           <span class="source-meta-text" title="${escapeAttr(group.path)}">${escapeHtml(meta)}</span>
@@ -485,8 +485,9 @@ function renderSourceGroups() {
       for (const snippet of visibleSnippets) {
         const row = document.createElement('div');
         row.className = 'item dir';
+        const childIconId = resolveEntryIcon(snippet);
         row.innerHTML = `
-          <span class="ico">${iconSvg(iconId)}</span>
+          <span class="ico">${iconSvg(childIconId)}</span>
           <span class="k" title="${escapeAttr(snippet.key)}">${escapeHtml(snippet.key)}</span>
           <span class="v" title="${escapeAttr(snippet.value)}">${escapeHtml(snippet.value)}</span>
           <span class="actions"></span>

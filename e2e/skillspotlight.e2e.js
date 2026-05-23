@@ -19,8 +19,9 @@ async function setupPage(page) {
     .filter((name) => !name.startsWith('.'))
     .sort((a, b) => a.localeCompare(b))
     .map((fileName) => ({
-      name: path.parse(fileName).name,
+      name: fs.statSync(path.join(fixtureDir, fileName)).isFile() ? fileName : path.parse(fileName).name,
       value: fs.realpathSync(path.join(fixtureDir, fileName)),
+      sourceChildKind: fs.statSync(path.join(fixtureDir, fileName)).isFile() ? 'file' : 'folder',
     }));
 
   await page.addInitScript((fixture) => {
@@ -116,7 +117,7 @@ test('adds regular snippet, imports directory snippets, and searches', async ({ 
   await expect(page.locator('#sourceGroups')).toContainText(fixtureDir);
   await expect(page.locator('#sourceGroups')).toContainText('skill-a');
   await expect(page.locator('#sourceGroups')).toContainText('skill-b');
-  await expect(page.locator('#sourceGroups')).toContainText('note');
+  await expect(page.locator('#sourceGroups')).toContainText('note.md');
   await expect(page.locator('#sourceGroups')).toContainText('skill-j');
 
   await page.locator('#chooseDirBtn').click();
@@ -148,8 +149,11 @@ test('adds regular snippet, imports directory snippets, and searches', async ({ 
     expect.objectContaining({ key: 'codexskill-a', value: fs.realpathSync(path.join(fixtureDir, 'skill-a')), kind: 'directory' }),
     expect.objectContaining({ key: 'codexskill-b', value: fs.realpathSync(path.join(fixtureDir, 'skill-b')), kind: 'directory' }),
     expect.objectContaining({ key: 'codexskill-j', value: fs.realpathSync(path.join(fixtureDir, 'skill-j')), kind: 'directory' }),
-    expect.objectContaining({ key: 'codexnote', value: fs.realpathSync(path.join(fixtureDir, 'note.md')), kind: 'directory' }),
+    expect.objectContaining({ key: 'codexnote.md', value: fs.realpathSync(path.join(fixtureDir, 'note.md')), kind: 'directory', sourceChildKind: 'file' }),
   ]));
+
+  await expect(page.locator('#sourceGroups .item.dir', { hasText: 'codexnote.md' }).locator('use')).toHaveAttribute('href', '#i-file');
+  await expect(page.locator('#sourceGroups .item.dir', { hasText: 'codexskill-a' }).locator('use')).toHaveAttribute('href', '#i-folder');
 
   await page.locator('#sourcePathInput').fill(`${fixtureDir}-secondary`);
   await page.locator('#sourcePrefixInput').fill('tmp:');

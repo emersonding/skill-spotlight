@@ -63,6 +63,7 @@ async function installE2eApi() {
       sourceId: source.id,
       sourcePath: source.path,
       name: entry.name,
+      sourceChildKind: entry.sourceChildKind || 'folder',
     }));
   }
 
