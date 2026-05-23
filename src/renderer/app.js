@@ -14,6 +14,7 @@ let editingDirectIndex = null;
 let route = 'search';
 let ignoreHoverSelection = false;
 let lastMousePosition = null;
+let capturingHotkey = false;
 
 const els = {
   shell: document.getElementById('app'),
@@ -264,11 +265,82 @@ function renderResults() {
 function renderSettings() {
   applyTheme();
   els.hotkey.textContent = state.hotkeyAccelerator || 'Alt+Space';
-  els.hotkeyInput.value = state.hotkeyAccelerator || 'Alt+Space';
+  if (!capturingHotkey) {
+    els.hotkeyInput.value = state.hotkeyAccelerator || 'Alt+Space';
+  }
   els.configPath.textContent = state.configPath || '';
   renderRegularSnippets();
   renderSourceGroups();
   updateSnippetCount();
+}
+
+function setHotkeyStatus(message = '', kind = '') {
+  els.hotkeyStatus.textContent = message;
+  els.hotkeyStatus.classList.toggle('success', kind === 'success');
+  els.hotkeyStatus.classList.toggle('error', kind === 'error');
+}
+
+async function startHotkeyCapture() {
+  capturingHotkey = true;
+  await api.setShortcutCaptureActive?.(true);
+  els.hotkeyInput.value = '';
+  els.hotkeyInput.placeholder = 'Press shortcut';
+  els.hotkeyInput.closest('.shortcut-capture')?.classList.add('recording');
+  els.saveHotkey.textContent = 'Cancel';
+  setHotkeyStatus('Press a shortcut now.');
+  els.hotkeyInput.focus();
+}
+
+async function stopHotkeyCapture() {
+  capturingHotkey = false;
+  await api.setShortcutCaptureActive?.(false);
+  els.hotkeyInput.placeholder = state.hotkeyAccelerator || 'Alt+Space';
+  els.hotkeyInput.value = state.hotkeyAccelerator || 'Alt+Space';
+  els.hotkeyInput.closest('.shortcut-capture')?.classList.remove('recording');
+  els.saveHotkey.textContent = 'Record';
+}
+
+function keyNameFromEvent(event) {
+  if (event.key === ' ' || event.code === 'Space') return 'Space';
+  if (/^F\d{1,2}$/.test(event.key)) return event.key;
+  if (event.key.startsWith('Arrow')) return event.key;
+  if (event.key.length === 1) return event.key.toUpperCase();
+  return event.key;
+}
+
+function captureAcceleratorFromEvent(event) {
+  if (['Alt', 'Control', 'Meta', 'Shift'].includes(event.key)) {
+    return { status: 'pending', accelerator: '' };
+  }
+
+  const key = keyNameFromEvent(event);
+  if (!key) return { status: 'invalid', accelerator: '' };
+
+  const modifiers = [];
+  if (event.metaKey) modifiers.push('Command');
+  if (event.ctrlKey) modifiers.push('Control');
+  if (event.altKey) modifiers.push('Alt');
+  if (event.shiftKey) modifiers.push('Shift');
+
+  const isFunctionKey = /^F\d{1,2}$/.test(key);
+  if (!modifiers.length && !isFunctionKey) return { status: 'invalid', accelerator: '' };
+  return { status: 'ready', accelerator: [...modifiers, key].join('+') };
+}
+
+async function registerCapturedHotkey(accelerator) {
+  const previous = state.hotkeyAccelerator || 'Alt+Space';
+  els.hotkeyInput.value = accelerator;
+  setHotkeyStatus(`Registering ${accelerator}...`);
+  const result = await api.setHotkey(accelerator);
+  if (result.ok) {
+    await stopHotkeyCapture();
+    await refreshState();
+    setHotkeyStatus(`Registered ${result.accelerator}`, 'success');
+    return;
+  }
+  await stopHotkeyCapture();
+  els.hotkeyInput.value = previous;
+  setHotkeyStatus(`Failed to register ${result.accelerator}. Keeping ${previous}.`, 'error');
 }
 
 function matchesFilter(entry, needle) {
@@ -734,10 +806,39 @@ els.themeSelect.addEventListener('change', async () => {
   await refreshState();
 });
 
-els.saveHotkey.addEventListener('click', async () => {
-  const result = await api.setHotkey(els.hotkeyInput.value.trim());
-  els.hotkeyStatus.textContent = result.ok ? `Registered ${result.accelerator}` : `Failed to register ${result.accelerator}`;
-  await refreshState();
+els.saveHotkey.addEventListener('click', () => {
+  if (capturingHotkey) {
+    void stopHotkeyCapture().then(() => setHotkeyStatus('Shortcut capture canceled.'));
+  } else {
+    void startHotkeyCapture();
+  }
+});
+
+els.hotkeyInput.addEventListener('click', () => {
+  if (!capturingHotkey) void startHotkeyCapture();
+});
+
+els.hotkeyInput.addEventListener('keydown', (event) => {
+  if (!capturingHotkey) return;
+  event.preventDefault();
+  event.stopPropagation();
+
+  if (event.key === 'Escape') {
+    void stopHotkeyCapture().then(() => setHotkeyStatus('Shortcut capture canceled.'));
+    return;
+  }
+
+  const captured = captureAcceleratorFromEvent(event);
+  if (captured.status === 'pending') {
+    setHotkeyStatus('Press a shortcut now.');
+    return;
+  }
+  if (captured.status === 'invalid') {
+    setHotkeyStatus('Failed to register shortcut. Press a key with Command, Control, Alt, or Shift.', 'error');
+    return;
+  }
+
+  void registerCapturedHotkey(captured.accelerator);
 });
 
 els.revealConfig.addEventListener('click', () => api.revealConfig());

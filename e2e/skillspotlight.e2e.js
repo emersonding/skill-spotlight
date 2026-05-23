@@ -215,13 +215,46 @@ test('updates appearance, shortcut, storage, and settings navigation', async ({ 
 
   await page.locator('[data-page="shortcutPage"]').click();
   await expect(page.locator('#shortcutPage')).toBeVisible();
-  await page.locator('#hotkeyInput').fill('Alt+Shift+Space');
   await page.locator('#saveHotkey').click();
+  await expect(page.locator('#hotkeyStatus')).toHaveText('Press a shortcut now.');
+  await expect.poll(() => page.evaluate(() => window.__SKILLSPOTLIGHT_E2E_CAPTURE_ACTIVE__)).toBe(true);
+  await page.evaluate(() => window.__SKILLSPOTLIGHT_E2E_TRIGGER_GLOBAL_SHORTCUT__());
+  expect(await calls(page, 'toggleWindow')).toHaveLength(0);
+  await page.keyboard.down('Alt');
+  await expect(page.locator('#hotkeyStatus')).toHaveText('Press a shortcut now.');
+  await page.keyboard.press('Space');
+  await page.keyboard.up('Alt');
+  await expect(page.locator('#hotkeyStatus')).toHaveText('Registered Alt+Space');
+  await expect(page.locator('#hotkey')).toHaveText('Alt+Space');
+  await expect.poll(() => page.evaluate(() => window.__SKILLSPOTLIGHT_E2E_CAPTURE_ACTIVE__)).toBe(false);
+  expect(await calls(page, 'setHotkey')).toEqual(expect.arrayContaining([
+    expect.objectContaining({ accelerator: 'Alt+Space' }),
+  ]));
+
+  await page.locator('#saveHotkey').click();
+  await page.keyboard.press('Alt+Shift+Space');
   await expect(page.locator('#hotkeyStatus')).toHaveText('Registered Alt+Shift+Space');
   await expect(page.locator('#hotkey')).toHaveText('Alt+Shift+Space');
   expect(await calls(page, 'setHotkey')).toEqual(expect.arrayContaining([
     expect.objectContaining({ accelerator: 'Alt+Shift+Space' }),
   ]));
+  await page.evaluate(() => window.__SKILLSPOTLIGHT_E2E_TRIGGER_GLOBAL_SHORTCUT__('Alt+Space'));
+  expect(await calls(page, 'toggleWindow')).toHaveLength(0);
+  await page.evaluate(() => window.__SKILLSPOTLIGHT_E2E_TRIGGER_GLOBAL_SHORTCUT__('Alt+Shift+Space'));
+  expect(await calls(page, 'toggleWindow')).toHaveLength(1);
+
+  await page.evaluate(() => {
+    window.__SKILLSPOTLIGHT_E2E_FAIL_HOTKEYS__ = ['Control+Alt+F12'];
+  });
+  await page.locator('#saveHotkey').click();
+  await expect(page.locator('#hotkeyStatus')).toHaveText('Press a shortcut now.');
+  await page.keyboard.press('Control+Alt+F12');
+  await expect(page.locator('#hotkeyStatus')).toHaveText('Failed to register Control+Alt+F12. Keeping Alt+Shift+Space.');
+  await expect(page.locator('#hotkey')).toHaveText('Alt+Shift+Space');
+  await page.evaluate(() => window.__SKILLSPOTLIGHT_E2E_TRIGGER_GLOBAL_SHORTCUT__('Control+Alt+F12'));
+  expect(await calls(page, 'toggleWindow')).toHaveLength(1);
+  await page.evaluate(() => window.__SKILLSPOTLIGHT_E2E_TRIGGER_GLOBAL_SHORTCUT__('Alt+Shift+Space'));
+  expect(await calls(page, 'toggleWindow')).toHaveLength(2);
 
   await page.locator('[data-page="storagePage"]').click();
   await expect(page.locator('#storagePage')).toBeVisible();
@@ -235,4 +268,13 @@ test('updates appearance, shortcut, storage, and settings navigation', async ({ 
   await expect(page.locator('#snippetsPage')).toBeVisible();
   await page.locator('#snippetFilter').fill('nothing');
   await expect(page.locator('#entryList')).toContainText('No snippets match the filter.');
+});
+
+test('keeps spotlight chrome draggable without making controls draggable', async ({ page }) => {
+  await setupPage(page);
+
+  await expect(page.locator('.settings-titlebar')).toHaveCSS('-webkit-app-region', 'drag');
+  await expect(page.locator('.search-bar')).toHaveCSS('-webkit-app-region', 'drag');
+  await expect(page.locator('#search')).toHaveCSS('-webkit-app-region', 'no-drag');
+  await expect(page.locator('#saveHotkey')).toHaveCSS('-webkit-app-region', 'no-drag');
 });

@@ -59,6 +59,7 @@ button,
 input,
 select {
   font: inherit;
+  -webkit-app-region: no-drag;
 }
 
 .shell {
@@ -82,6 +83,7 @@ select {
   gap: 14px;
   padding: 18px 22px;
   border-bottom: 1px solid var(--line);
+  -webkit-app-region: drag;
 }
 
 .glyph {
@@ -286,6 +288,7 @@ select {
   border-top: 1px solid var(--line);
   background: var(--panel-2);
   font-size: 11.5px;
+  -webkit-app-region: drag;
 }
 
 .footer .grow { flex: 1; }
@@ -950,6 +953,22 @@ p {
 
 .text-field[readonly] {
   color: var(--muted);
+  cursor: pointer;
+}
+
+.shortcut-capture {
+  max-width: 420px;
+}
+
+.shortcut-capture .text-field {
+  flex: 1;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+.shortcut-capture.recording .text-field {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+  color: var(--text);
 }
 
 .readonly-field {
@@ -1073,6 +1092,14 @@ button.primary.danger-action:hover {
   margin-top: 10px;
   color: var(--muted);
   font-size: 12px;
+}
+
+.muted.success {
+  color: var(--good);
+}
+
+.muted.error {
+  color: var(--danger);
 }
 
 select.text-field {

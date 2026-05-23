@@ -8,6 +8,8 @@ async function installE2eApi() {
   const shownCallbacks = [];
   window.__SKILLSPOTLIGHT_E2E_APPLY_SYNC_CALLS__ = [];
   window.__SKILLSPOTLIGHT_E2E_CALLS__ = [];
+  window.__SKILLSPOTLIGHT_E2E_CAPTURE_ACTIVE__ = false;
+  window.__SKILLSPOTLIGHT_E2E_ACTIVE_HOTKEY__ = 'Alt+Space';
   let undoEntries = null;
   let state = {
     config: { entries: [], recentSources: [], hotkey: { key: 'Space', modifiers: ['option'] }, theme: 'light' },
@@ -33,6 +35,15 @@ async function installE2eApi() {
   function recordCall(name, payload = {}) {
     window.__SKILLSPOTLIGHT_E2E_CALLS__.push({ name, ...clone(payload) });
   }
+
+  window.__SKILLSPOTLIGHT_E2E_TRIGGER_GLOBAL_SHORTCUT__ = (accelerator) => {
+    if (
+      !window.__SKILLSPOTLIGHT_E2E_CAPTURE_ACTIVE__ &&
+      (!accelerator || accelerator === window.__SKILLSPOTLIGHT_E2E_ACTIVE_HOTKEY__)
+    ) {
+      recordCall('toggleWindow', { accelerator: accelerator || window.__SKILLSPOTLIGHT_E2E_ACTIVE_HOTKEY__ });
+    }
+  };
 
   function rebuildSourceGroups() {
     state.effectiveEntries = clone(state.config.entries);
@@ -157,9 +168,18 @@ async function installE2eApi() {
     },
     setHotkey: async (accelerator) => {
       recordCall('setHotkey', { accelerator });
+      if ((window.__SKILLSPOTLIGHT_E2E_FAIL_HOTKEYS__ || []).includes(accelerator)) {
+        return { ok: false, accelerator };
+      }
       state.hotkeyAccelerator = accelerator;
+      window.__SKILLSPOTLIGHT_E2E_ACTIVE_HOTKEY__ = accelerator;
       emitState();
       return { ok: true, accelerator };
+    },
+    setShortcutCaptureActive: async (active) => {
+      window.__SKILLSPOTLIGHT_E2E_CAPTURE_ACTIVE__ = Boolean(active);
+      recordCall('setShortcutCaptureActive', { active: Boolean(active) });
+      return { ok: true };
     },
     reloadConfig: async () => {
       recordCall('reloadConfig');
@@ -188,25 +208,46 @@ async function installE2eApi() {
 async function installTauriApi() {
   const { invoke } = await import('@tauri-apps/api/core');
   const { listen } = await import('@tauri-apps/api/event');
-  const { register, unregisterAll } = await import('@tauri-apps/plugin-global-shortcut');
+  const { register, unregister, unregisterAll } = await import('@tauri-apps/plugin-global-shortcut');
+  let shortcutCaptureActive = false;
+
+  function handleGlobalShortcut(event) {
+    if (shortcutCaptureActive) return;
+    if (event.state === 'Pressed') {
+      void invoke('toggle_window');
+    }
+  }
 
   async function registerHotkey(accelerator) {
-  await unregisterAll();
-  registeredHotkey = '';
-  if (!accelerator) return { ok: false, accelerator: '' };
+    const next = String(accelerator || '').trim();
+    if (!next) return { ok: false, accelerator: '' };
+    if (next === registeredHotkey) return { ok: true, accelerator: next };
 
-  try {
-    await register(accelerator, (event) => {
-      if (event.state === 'Pressed') {
-        void invoke('toggle_window');
+    const previous = registeredHotkey;
+    if (previous) {
+      try {
+        await unregister(previous);
+      } catch {
+        return { ok: false, accelerator: next };
       }
-    });
-    registeredHotkey = accelerator;
-    return { ok: true, accelerator };
-  } catch {
-    return { ok: false, accelerator };
+    }
+
+    try {
+      await register(next, handleGlobalShortcut);
+      registeredHotkey = next;
+      return { ok: true, accelerator: next };
+    } catch {
+      if (previous) {
+        try {
+          await register(previous, handleGlobalShortcut);
+          registeredHotkey = previous;
+        } catch {
+          registeredHotkey = '';
+        }
+      }
+      return { ok: false, accelerator: next };
+    }
   }
-}
 
   window.skillSpotlight = {
   homeDir: '',
@@ -228,6 +269,10 @@ async function installTauriApi() {
     const result = await registerHotkey(accelerator);
     if (result.ok) await invoke('set_hotkey', { accelerator });
     return result;
+  },
+  setShortcutCaptureActive: async (active) => {
+    shortcutCaptureActive = Boolean(active);
+    return { ok: true };
   },
   reloadConfig: async () => {
     const result = await invoke('reload_config');
