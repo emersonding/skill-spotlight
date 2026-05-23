@@ -270,11 +270,27 @@ test('updates appearance, shortcut, storage, and settings navigation', async ({ 
   await expect(page.locator('#entryList')).toContainText('No snippets match the filter.');
 });
 
-test('keeps spotlight chrome draggable without making controls draggable', async ({ page }) => {
+test('starts native window drag from chrome without making controls draggable', async ({ page }) => {
   await setupPage(page);
 
-  await expect(page.locator('.settings-titlebar')).toHaveCSS('-webkit-app-region', 'drag');
-  await expect(page.locator('.search-bar')).toHaveCSS('-webkit-app-region', 'drag');
-  await expect(page.locator('#search')).toHaveCSS('-webkit-app-region', 'no-drag');
-  await expect(page.locator('#saveHotkey')).toHaveCSS('-webkit-app-region', 'no-drag');
+  const dragMouseDown = { button: 0, buttons: 1, bubbles: true };
+
+  await page.locator('.settings-titlebar').dispatchEvent('mousedown', dragMouseDown);
+  await expect.poll(() => calls(page, 'startWindowDrag')).toHaveLength(1);
+
+  await page.locator('#newKey').dispatchEvent('mousedown', dragMouseDown);
+  await expect.poll(() => calls(page, 'startWindowDrag')).toHaveLength(1);
+
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#searchView')).toBeVisible();
+
+  await page.locator('.glyph').dispatchEvent('mousedown', dragMouseDown);
+  await expect.poll(() => calls(page, 'startWindowDrag')).toHaveLength(2);
+
+  await page.locator('#search').dispatchEvent('mousedown', dragMouseDown);
+  await page.locator('#prefsBtn').dispatchEvent('mousedown', dragMouseDown);
+  await expect.poll(() => calls(page, 'startWindowDrag')).toHaveLength(2);
+
+  await page.locator('.foot-item').first().dispatchEvent('mousedown', dragMouseDown);
+  await expect.poll(() => calls(page, 'startWindowDrag')).toHaveLength(3);
 });

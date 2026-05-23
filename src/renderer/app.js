@@ -54,6 +54,25 @@ const els = {
 
 let confirmResolver = null;
 
+function isInteractiveDragTarget(target) {
+  return Boolean(target.closest('button, input, select, textarea, a, [contenteditable="true"], [data-no-drag]'));
+}
+
+function shouldStartWindowDrag(event) {
+  if (event.defaultPrevented || event.button !== 0 || event.buttons !== 1) return false;
+  if (isInteractiveDragTarget(event.target)) return false;
+  return Boolean(event.target.closest('[data-window-drag-region]'));
+}
+
+function installWindowDragRegions() {
+  document.addEventListener('mousedown', (event) => {
+    if (!shouldStartWindowDrag(event)) return;
+    void api.startWindowDrag?.().catch((error) => {
+      console.error('Failed to start window drag', error);
+    });
+  });
+}
+
 function showConfirm({ title = 'Are you sure?', body = '', okLabel = 'Confirm', cancelLabel = 'Cancel', destructive = false } = {}) {
   els.confirmTitle.textContent = title;
   els.confirmBody.textContent = body;
@@ -871,4 +890,5 @@ api.onState((payload) => {
   renderSettings();
 });
 
+installWindowDragRegions();
 refreshState();

@@ -11,7 +11,7 @@ use std::{
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::TrayIconBuilder,
-    AppHandle, Emitter, Manager, Size, WebviewWindow, WindowEvent,
+    AppHandle, Emitter, Manager, PhysicalPosition, Size, WebviewWindow, WindowEvent,
 };
 use tauri_plugin_dialog::DialogExt;
 
@@ -132,6 +132,7 @@ struct AppData {
     is_visible: bool,
     suppress_blur_hide: bool,
     last_frontmost_app: Option<FrontmostApp>,
+    last_window_position: Option<PhysicalPosition<i32>>,
 }
 
 impl AppData {
@@ -143,6 +144,7 @@ impl AppData {
             is_visible: false,
             suppress_blur_hide: false,
             last_frontmost_app: None,
+            last_window_position: None,
         }
     }
 }
@@ -605,7 +607,7 @@ fn current_window(app: &AppHandle) -> Result<WebviewWindow, String> {
         .ok_or_else(|| "main window not found".to_string())
 }
 
-fn resize_for_route(window: &WebviewWindow, route: &str) -> Result<(), String> {
+fn resize_for_route(app: &AppHandle, window: &WebviewWindow, route: &str) -> Result<(), String> {
     let (width, height) = if route == "settings" || route == "prefs" {
         (SETTINGS_WIDTH, SETTINGS_HEIGHT)
     } else {
@@ -614,15 +616,28 @@ fn resize_for_route(window: &WebviewWindow, route: &str) -> Result<(), String> {
     window
         .set_size(Size::Logical(tauri::LogicalSize { width, height }))
         .map_err(|err| err.to_string())?;
-    window.center().map_err(|err| err.to_string())
+    let last_position = {
+        let state = app.state::<Mutex<AppData>>();
+        let data = state.lock().expect("app state poisoned");
+        data.last_window_position
+    };
+    if let Some(position) = last_position {
+        window.set_position(position).map_err(|err| err.to_string())
+    } else {
+        window.center().map_err(|err| err.to_string())
+    }
 }
 
 fn hide_window(app: &AppHandle) -> Result<(), String> {
     let window = current_window(app)?;
+    let position = window.outer_position().ok();
     window.hide().map_err(|err| err.to_string())?;
     let state = app.state::<Mutex<AppData>>();
     let mut data = state.lock().expect("app state poisoned");
     data.is_visible = false;
+    if position.is_some() {
+        data.last_window_position = position;
+    }
     Ok(())
 }
 
@@ -635,7 +650,7 @@ fn show_window(app: &AppHandle, route: &str) -> Result<(), String> {
     }
 
     let window = current_window(app)?;
-    resize_for_route(&window, route)?;
+    resize_for_route(app, &window, route)?;
     window.show().map_err(|err| err.to_string())?;
     window.set_focus().map_err(|err| err.to_string())?;
     {
@@ -688,7 +703,7 @@ fn toggle_window(app: AppHandle) -> Result<(), String> {
 #[tauri::command]
 fn set_route(app: AppHandle, route: String) -> Result<serde_json::Value, String> {
     let window = current_window(&app)?;
-    resize_for_route(&window, &route)?;
+    resize_for_route(&app, &window, &route)?;
     Ok(serde_json::json!({ "ok": true }))
 }
 

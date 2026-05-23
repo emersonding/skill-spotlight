@@ -73,6 +73,10 @@ async function installE2eApi() {
       recordCall('hide');
       return { ok: true };
     },
+    startWindowDrag: async () => {
+      recordCall('startWindowDrag');
+      return { ok: true };
+    },
     setRoute: async () => ({ ok: true }),
     pasteEntry: async (entry) => {
       recordCall('pasteEntry', { entry });
@@ -208,8 +212,10 @@ async function installE2eApi() {
 async function installTauriApi() {
   const { invoke } = await import('@tauri-apps/api/core');
   const { listen } = await import('@tauri-apps/api/event');
+  const { getCurrentWindow } = await import('@tauri-apps/api/window');
   const { register, unregister, unregisterAll } = await import('@tauri-apps/plugin-global-shortcut');
   let shortcutCaptureActive = false;
+  const currentWindow = getCurrentWindow();
 
   function handleGlobalShortcut(event) {
     if (shortcutCaptureActive) return;
@@ -253,6 +259,7 @@ async function installTauriApi() {
   homeDir: '',
   getState: () => invoke('get_state'),
   hide: () => invoke('hide'),
+  startWindowDrag: () => currentWindow.startDragging(),
   setRoute: (route) => invoke('set_route', { route }),
   pasteEntry: (entry) => invoke('paste_entry', { entry }),
   copyEntry: (entry) => invoke('copy_entry', { entry }),

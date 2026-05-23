@@ -19,7 +19,7 @@
       </defs>
     </svg>
     <div id="app" class="shell">
-      <header class="search-bar">
+      <header class="search-bar" data-window-drag-region>
         <div class="glyph">⌘</div>
         <input id="search" autocomplete="off" spellcheck="false" placeholder="Search skills and snippets">
         <div id="hotkey" class="hotkey"></div>
@@ -27,7 +27,7 @@
 
       <main id="searchView" class="view">
         <div id="results" class="results"></div>
-        <footer class="footer">
+        <footer class="footer" data-window-drag-region>
           <button id="prefsBtn" class="ghost">Preferences</button>
           <span class="grow"></span>
           <span class="foot-item"><span class="kbd">↵</span> Paste</span>
@@ -38,7 +38,7 @@
       </main>
 
       <main id="settingsView" class="view hidden">
-        <div class="settings-titlebar">
+        <div class="settings-titlebar" data-window-drag-region>
           <div class="title">Preferences</div>
           <span class="title-sub">SkillSpotlight</span>
         </div>
