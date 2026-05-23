@@ -1,0 +1,26 @@
+{
+  "name": "skillspotlight-tauri",
+  "version": "0.3.0",
+  "private": true,
+  "description": "SkillSpotlight, rebuilt on Tauri to reduce packaged app size",
+  "type": "module",
+  "scripts": {
+    "dev": "tauri dev",
+    "start": "tauri dev",
+    "build": "tauri build",
+    "build:frontend": "vite build",
+    "dev:frontend": "vite --host 127.0.0.1",
+    "check": "vite build && cargo check --manifest-path src-tauri/Cargo.toml",
+    "test": "cargo test --manifest-path src-tauri/Cargo.toml",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.9.0",
+    "@tauri-apps/plugin-global-shortcut": "^2.3.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.60.0",
+    "@tauri-apps/cli": "^2.9.0",
+    "vite": "^7.2.0"
+  }
+}

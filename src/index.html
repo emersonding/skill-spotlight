@@ -1,0 +1,173 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'">
+    <title>SkillSpotlight</title>
+    <link rel="stylesheet" href="./renderer/styles.css">
+  </head>
+  <body>
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+      <defs>
+        <symbol id="i-direct" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3.6 11.1 11.1 3.6c.3-.3.7-.5 1.1-.5h6.7c.9 0 1.6.7 1.6 1.6v6.7c0 .4-.2.8-.5 1.1l-7.5 7.5c-.6.6-1.6.6-2.2 0L3.6 13.3a1.6 1.6 0 0 1 0-2.2Z"/>
+          <circle cx="16.2" cy="7.8" r="1.4" fill="currentColor" stroke="none"/>
+        </symbol>
+        <symbol id="i-folder" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 7.5c0-1 .8-1.8 1.8-1.8h4.4l2 2.4h8c1 0 1.8.8 1.8 1.8v8.3c0 1-.8 1.8-1.8 1.8H4.8c-1 0-1.8-.8-1.8-1.8V7.5Z"/>
+        </symbol>
+      </defs>
+    </svg>
+    <div id="app" class="shell">
+      <header class="search-bar">
+        <div class="glyph">⌘</div>
+        <input id="search" autocomplete="off" spellcheck="false" placeholder="Search skills and snippets">
+        <div id="hotkey" class="hotkey"></div>
+      </header>
+
+      <main id="searchView" class="view">
+        <div id="results" class="results"></div>
+        <footer class="footer">
+          <button id="prefsBtn" class="ghost">Preferences</button>
+          <span class="grow"></span>
+          <span class="foot-item"><span class="kbd">↵</span> Paste</span>
+          <span class="foot-item"><span class="kbd">⌘</span><span class="kbd">C</span> Copy</span>
+          <span class="foot-item"><span class="kbd">⌘</span><span class="kbd">↵</span> Reveal</span>
+          <span class="foot-item"><span class="kbd">Esc</span> Close</span>
+        </footer>
+      </main>
+
+      <main id="settingsView" class="view hidden">
+        <div class="settings-titlebar">
+          <div class="title">Preferences</div>
+          <span class="title-sub">SkillSpotlight</span>
+        </div>
+        <aside class="settings-nav">
+          <div class="rail-group">
+            <div class="rail-label">Settings</div>
+            <button data-page="snippetsPage" class="active">
+              <span>Snippets</span>
+              <span class="count" data-count="snippets"></span>
+            </button>
+            <button data-page="appearancePage"><span>Appearance</span></button>
+            <button data-page="shortcutPage"><span>Shortcut</span></button>
+            <button data-page="storagePage"><span>Storage</span></button>
+          </div>
+        </aside>
+
+        <section class="settings-content">
+          <div id="snippetsPage" class="settings-page">
+            <div class="page-header">
+              <div>
+                <h1>Snippets</h1>
+                <p>Direct snippets and directory sources, side by side.</p>
+              </div>
+              <div class="filter">
+                <span class="filter-glyph">⌕</span>
+                <input id="snippetFilter" placeholder="Filter by key or value…" autocomplete="off" spellcheck="false">
+                <span class="kbd">/</span>
+              </div>
+            </div>
+
+            <section class="snippet-card">
+              <header class="card-head">
+                <div class="card-head-text">
+                  <h2>Direct snippets</h2>
+                  <span class="card-meta" data-meta="direct">0 entries</span>
+                </div>
+                <button id="undo" class="ghost">Undo</button>
+              </header>
+              <div class="add-bar">
+                <span class="add-ico">＋</span>
+                <input id="newKey" class="add-key" placeholder="key…" autocomplete="off" spellcheck="false">
+                <input id="newValue" class="add-val" placeholder="value (press Enter to add)…" autocomplete="off" spellcheck="false">
+                <button id="addEntry" class="primary">Add</button>
+              </div>
+              <div id="entryList" class="item-list"></div>
+            </section>
+
+            <section class="snippet-card">
+              <header class="card-head">
+                <div class="card-head-text">
+                  <h2>Directory sources</h2>
+                  <span class="card-meta" data-meta="dir">0 directories</span>
+                </div>
+              </header>
+              <div class="add-bar add-bar-dir">
+                <span class="add-ico"><svg aria-hidden="true"><use href="#i-folder"/></svg></span>
+                <div class="add-text">
+                  <strong>Add a directory</strong>
+                  <span>Every file inside becomes a snippet. You can edit the prefix after.</span>
+                </div>
+                <button id="chooseDirBtn" class="primary">Browse…</button>
+              </div>
+              <div id="sourceGroups" class="item-list"></div>
+            </section>
+
+            <form class="visually-hidden" aria-hidden="true">
+              <input id="sourcePathInput" type="text">
+              <input id="sourcePrefixInput" type="text">
+              <button id="addDirectory" type="button"></button>
+            </form>
+
+            <div id="confirmDialog" class="modal-overlay hidden" aria-hidden="true">
+              <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+                <h2 id="confirmTitle">Remove?</h2>
+                <p id="confirmBody"></p>
+                <div class="dialog-actions">
+                  <button id="confirmCancel" class="ghost">Cancel</button>
+                  <button id="confirmOk" class="primary danger-action">Remove</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div id="appearancePage" class="settings-page hidden">
+            <div class="page-header">
+              <div>
+                <h1>Appearance</h1>
+                <p>Choose how SkillSpotlight looks.</p>
+              </div>
+            </div>
+            <label class="field-label">Theme</label>
+            <select id="themeSelect" class="text-field">
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+            </select>
+          </div>
+
+          <div id="shortcutPage" class="settings-page hidden">
+            <div class="page-header">
+              <div>
+                <h1>Shortcut</h1>
+                <p>Set the global shortcut used to open the search bar.</p>
+              </div>
+            </div>
+            <label class="field-label">Global shortcut</label>
+            <div class="inline-form">
+              <input id="hotkeyInput" class="text-field" placeholder="Alt+Space">
+              <button id="saveHotkey" class="primary">Save</button>
+            </div>
+            <div id="hotkeyStatus" class="muted"></div>
+          </div>
+
+          <div id="storagePage" class="settings-page hidden">
+            <div class="page-header">
+              <div>
+                <h1>Storage</h1>
+                <p>Inspect and reload the local config file.</p>
+              </div>
+            </div>
+            <label class="field-label">Config path</label>
+            <div id="configPath" class="path-box"></div>
+            <div class="toolbar">
+              <button id="revealConfig">Reveal</button>
+              <button id="reloadConfig">Reload</button>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+    <script type="module" src="./tauri-api.js"></script>
+  </body>
+</html>

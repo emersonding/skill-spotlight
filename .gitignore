@@ -1,0 +1,9 @@
+node_modules/
+dist/
+src-tauri/target/
+src-tauri/gen/
+out/
+test-results/
+e2e/.runtime/
+*.log
+.dev-config.json
