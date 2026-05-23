@@ -68,7 +68,7 @@ Open the built app from the release bundle for the manual smoke checks.
 Create a Git tag using the app version:
 
 ```bash
-git tag v0.3.0
+git tag v0.3.1
 ```
 
 Attach the DMG to the release. Include notes for user-visible changes, known issues, and whether config migration is required.
