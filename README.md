@@ -28,6 +28,19 @@ npm test
 npm run test:e2e
 ```
 
+## Test Coverage
+
+`npm test` runs the Rust unit tests for config loading, directory scanning, source updates, hotkey conversion, and default paths.
+
+`npm run test:e2e` runs the browser fixture suite for the main UI flows:
+
+- direct snippet add, edit, confirm, revert, delete, and undo
+- directory import, duplicate warning, prefix edit, collapse/expand, refresh, reveal, remove, and sync
+- search results, no-match state, hover/keyboard selection, paste/copy/reveal invocation, and close invocation
+- settings navigation, theme changes, hotkey save, config path display, reload, and reveal invocation
+
+The e2e suite runs against the browser shim in `src/tauri-api.js`. It verifies UI behavior and command invocation, but it does not exercise native macOS dialogs, clipboard writes, global shortcut registration, or Finder reveal behavior end-to-end.
+
 Build the macOS app and DMG:
 
 ```bash
@@ -49,6 +62,10 @@ The Tauri version reads and writes its own default config file:
 ```
 
 `SS_CONFIG_PATH` is still supported for development or isolated testing.
+
+## Release
+
+See `RELEASE.md` for the release checklist and artifact verification steps.
 
 ## Size
 

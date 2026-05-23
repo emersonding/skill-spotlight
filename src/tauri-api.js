@@ -7,6 +7,8 @@ async function installE2eApi() {
   const stateCallbacks = [];
   const shownCallbacks = [];
   window.__SKILLSPOTLIGHT_E2E_APPLY_SYNC_CALLS__ = [];
+  window.__SKILLSPOTLIGHT_E2E_CALLS__ = [];
+  let undoEntries = null;
   let state = {
     config: { entries: [], recentSources: [], hotkey: { key: 'Space', modifiers: ['option'] }, theme: 'light' },
     effectiveEntries: [],
@@ -26,6 +28,10 @@ async function installE2eApi() {
 
   function normalizePrefix(prefix) {
     return String(prefix || '').trim();
+  }
+
+  function recordCall(name, payload = {}) {
+    window.__SKILLSPOTLIGHT_E2E_CALLS__.push({ name, ...clone(payload) });
   }
 
   function rebuildSourceGroups() {
@@ -52,26 +58,51 @@ async function installE2eApi() {
   window.skillSpotlight = {
     homeDir: fixture.homeDir || '',
     getState: async () => clone(state),
-    hide: async () => ({ ok: true }),
+    hide: async () => {
+      recordCall('hide');
+      return { ok: true };
+    },
     setRoute: async () => ({ ok: true }),
-    pasteEntry: async () => ({ mode: 'paste' }),
-    copyEntry: async () => ({ ok: true }),
-    revealEntry: async () => undefined,
+    pasteEntry: async (entry) => {
+      recordCall('pasteEntry', { entry });
+      return { mode: 'paste' };
+    },
+    copyEntry: async (entry) => {
+      recordCall('copyEntry', { entry });
+      return { ok: true };
+    },
+    revealEntry: async (entry) => {
+      recordCall('revealEntry', { entry });
+      return undefined;
+    },
     saveEntries: async (entries) => {
+      undoEntries = clone(state.config.entries);
       state.config.entries = clone(entries);
       rebuildSourceGroups();
       emitState();
       return { ok: true };
     },
     setTheme: async (theme) => {
+      recordCall('setTheme', { theme });
       state.config.theme = theme === 'dark' ? 'dark' : 'light';
       emitState();
       return { ok: true };
     },
-    undo: async () => ({ ok: false }),
+    undo: async () => {
+      recordCall('undo');
+      if (!undoEntries) return { ok: false };
+      const current = clone(state.config.entries);
+      state.config.entries = undoEntries;
+      undoEntries = current;
+      rebuildSourceGroups();
+      emitState();
+      return { ok: true };
+    },
     chooseSyncDirectory: async () => fixture.fixtureDir || null,
     applySync: async (source, replaceKeys = []) => {
       window.__SKILLSPOTLIGHT_E2E_APPLY_SYNC_CALLS__.push(clone(source));
+      recordCall('applySync', { source });
+      undoEntries = clone(state.config.entries);
       const sourceId = source.id || `source-${Date.now()}`;
       const nextSource = {
         id: sourceId,
@@ -92,6 +123,7 @@ async function installE2eApi() {
       return { ok: true, ignoredReplaceKeys: replaceKeys };
     },
     saveSource: async (source) => {
+      recordCall('saveSource', { source });
       state.config.recentSources = [
         source,
         ...state.config.recentSources.filter((item) => item.id !== source.id),
@@ -105,21 +137,42 @@ async function installE2eApi() {
       return { ok: true };
     },
     removeSource: async (sourceId) => {
+      recordCall('removeSource', { sourceId });
       state.config.recentSources = state.config.recentSources.filter((source) => source.id !== sourceId);
       state.config.entries = state.config.entries.filter((entry) => entry.kind !== 'directory' || entry.sourceId !== sourceId);
       rebuildSourceGroups();
       emitState();
       return { ok: true };
     },
-    syncAll: async () => undefined,
+    syncAll: async () => {
+      recordCall('syncAll');
+      state.config.recentSources = state.config.recentSources.map((source) => ({ ...source }));
+      state.config.entries = [
+        ...state.config.entries.filter((entry) => entry.kind !== 'directory'),
+        ...state.config.recentSources.flatMap((source) => scanFixtureSource(source)),
+      ];
+      rebuildSourceGroups();
+      emitState();
+      return undefined;
+    },
     setHotkey: async (accelerator) => {
+      recordCall('setHotkey', { accelerator });
       state.hotkeyAccelerator = accelerator;
       emitState();
       return { ok: true, accelerator };
     },
-    reloadConfig: async () => ({ ok: true }),
-    revealConfig: async () => undefined,
-    revealSource: async () => undefined,
+    reloadConfig: async () => {
+      recordCall('reloadConfig');
+      return { ok: true };
+    },
+    revealConfig: async () => {
+      recordCall('revealConfig');
+      return undefined;
+    },
+    revealSource: async (path) => {
+      recordCall('revealSource', { path });
+      return undefined;
+    },
     onShown: (callback) => {
       shownCallbacks.push(callback);
       queueMicrotask(() => callback({ route: 'settings' }));
