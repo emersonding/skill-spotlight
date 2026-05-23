@@ -8,6 +8,28 @@ Add a direct snippet like `foo` -> `bar`, search for `foo`, press `Enter`, and S
 
 ![SkillSpotlight search results for clean-code](assets/readme/spotlight-search-clean-code.png)
 
+## Installation
+
+1. Download the DMG, open it, and drag `SkillSpotlight.app` to `/Applications`.
+2. If macOS blocks the unsigned app, run:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/SkillSpotlight.app
+```
+
+3. Open SkillSpotlight from `/Applications`.
+
+## macOS Permissions
+
+SkillSpotlight only asks for system access when a feature needs it:
+
+- Accessibility: used by paste mode to return focus to the previous app and send `Cmd+V`. Copy mode still works without it.
+- Automation/System Events: macOS may ask for this when SkillSpotlight activates the previous app or asks System Events to paste.
+- Files and Folders: used when you import a skill directory, reveal a source file, or reveal the config file. SkillSpotlight reads the directories you choose and stores config locally.
+- Clipboard: used to copy snippets and to paste by temporarily placing the selected snippet on the clipboard.
+
+Full Disk Access is not required unless you choose to import a macOS-protected directory that the system blocks.
+
 ## Why This App
 
 Many skills are most useful when invocation is intentional. They can be expensive, slow, opinionated, or disruptive outside the workflow they were designed for. A deep-research skill, for example, can be valuable when you explicitly want deep research, but noisy when an agent reaches for it during a quick search or lightweight coding task.
