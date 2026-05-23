@@ -165,16 +165,14 @@ fn default_config_path() -> PathBuf {
 }
 
 fn default_config_path_for_home(home: PathBuf) -> PathBuf {
-    home
-        .join("Library")
+    home.join("Library")
         .join("Application Support")
         .join("skill-spotlight")
         .join("config.json")
 }
 
 fn legacy_config_path_for_home(home: PathBuf) -> PathBuf {
-    home
-        .join("Library")
+    home.join("Library")
         .join("Application Support")
         .join("skillspotlight-tauri")
         .join("config.json")
@@ -616,6 +614,37 @@ fn capture_frontmost_app() -> Option<FrontmostApp> {
     Some(FrontmostApp { name, bundle_id })
 }
 
+fn activate_frontmost_app(frontmost: &FrontmostApp) {
+    if cfg!(not(target_os = "macos")) {
+        return;
+    }
+    if !frontmost.bundle_id.is_empty() {
+        let script = vec![format!(
+            "tell application id \"{}\" to activate",
+            frontmost.bundle_id
+        )];
+        let _ = run_osascript(&script);
+    } else if !frontmost.name.is_empty() {
+        let script = vec![format!(
+            "tell application \"{}\" to activate",
+            frontmost.name
+        )];
+        let _ = run_osascript(&script);
+    }
+}
+
+fn activate_last_frontmost_app(app: &AppHandle) {
+    let last_frontmost_app = {
+        let state = app.state::<Mutex<AppData>>();
+        let data = state.lock().expect("app state poisoned");
+        data.last_frontmost_app.clone()
+    };
+    if let Some(frontmost) = last_frontmost_app {
+        thread::sleep(Duration::from_millis(60));
+        activate_frontmost_app(&frontmost);
+    }
+}
+
 fn read_clipboard() -> String {
     Command::new("pbpaste")
         .output()
@@ -677,6 +706,12 @@ fn hide_window(app: &AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+fn hide_window_and_restore_focus(app: &AppHandle) -> Result<(), String> {
+    hide_window(app)?;
+    activate_last_frontmost_app(app);
+    Ok(())
+}
+
 fn show_window(app: &AppHandle, route: &str) -> Result<(), String> {
     let last_frontmost_app = capture_frontmost_app();
     {
@@ -719,7 +754,7 @@ fn get_state(state: tauri::State<'_, Mutex<AppData>>) -> StatePayload {
 
 #[tauri::command]
 fn hide(app: AppHandle) -> Result<(), String> {
-    hide_window(&app)
+    hide_window_and_restore_focus(&app)
 }
 
 #[tauri::command]
@@ -730,7 +765,7 @@ fn toggle_window(app: AppHandle) -> Result<(), String> {
         data.is_visible
     };
     if visible {
-        hide_window(&app)
+        hide_window_and_restore_focus(&app)
     } else {
         show_window(&app, "search")
     }
@@ -751,27 +786,7 @@ async fn paste_entry(app: AppHandle, entry: Entry) -> Result<serde_json::Value, 
     write_clipboard(&value)?;
 
     if cfg!(target_os = "macos") {
-        thread::sleep(Duration::from_millis(60));
-        let last_frontmost_app = {
-            let state = app.state::<Mutex<AppData>>();
-            let data = state.lock().expect("app state poisoned");
-            data.last_frontmost_app.clone()
-        };
-        if let Some(frontmost) = last_frontmost_app {
-            if !frontmost.bundle_id.is_empty() {
-                let script = vec![format!(
-                    "tell application id \"{}\" to activate",
-                    frontmost.bundle_id
-                )];
-                let _ = run_osascript(&script);
-            } else if !frontmost.name.is_empty() {
-                let script = vec![format!(
-                    "tell application \"{}\" to activate",
-                    frontmost.name
-                )];
-                let _ = run_osascript(&script);
-            }
-        }
+        activate_last_frontmost_app(&app);
         thread::sleep(Duration::from_millis(90));
         let _ = run_osascript(&[
             "tell application \"System Events\" to keystroke \"v\" using command down".to_string(),
@@ -790,6 +805,7 @@ async fn paste_entry(app: AppHandle, entry: Entry) -> Result<serde_json::Value, 
 fn copy_entry(app: AppHandle, entry: Entry) -> Result<serde_json::Value, String> {
     hide_window(&app)?;
     write_clipboard(&entry.value)?;
+    activate_last_frontmost_app(&app);
     Ok(serde_json::json!({ "ok": true }))
 }
 
@@ -1132,9 +1148,7 @@ mod tests {
         let path = default_config_path_for_home(PathBuf::from("/Users/example"));
         assert_eq!(
             path,
-            PathBuf::from(
-                "/Users/example/Library/Application Support/skill-spotlight/config.json"
-            )
+            PathBuf::from("/Users/example/Library/Application Support/skill-spotlight/config.json")
         );
     }
 
@@ -1148,7 +1162,10 @@ mod tests {
 
         migrate_legacy_config_if_needed(&config_path, &legacy_path);
 
-        assert_eq!(fs::read_to_string(&config_path).unwrap(), r#"{"theme":"dark"}"#);
+        assert_eq!(
+            fs::read_to_string(&config_path).unwrap(),
+            r#"{"theme":"dark"}"#
+        );
         assert!(!legacy_path.exists());
     }
 
