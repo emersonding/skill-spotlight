@@ -165,14 +165,16 @@ fn default_config_path() -> PathBuf {
 }
 
 fn default_config_path_for_home(home: PathBuf) -> PathBuf {
-    home.join("Library")
+    home
+        .join("Library")
         .join("Application Support")
         .join("skill-spotlight")
         .join("config.json")
 }
 
 fn legacy_config_path_for_home(home: PathBuf) -> PathBuf {
-    home.join("Library")
+    home
+        .join("Library")
         .join("Application Support")
         .join("skillspotlight-tauri")
         .join("config.json")
@@ -588,62 +590,71 @@ fn run_osascript(lines: &[String]) -> String {
     }
 }
 
+#[cfg(target_os = "macos")]
 fn capture_frontmost_app() -> Option<FrontmostApp> {
-    if cfg!(not(target_os = "macos")) {
+    use objc2_app_kit::{NSRunningApplication, NSWorkspace};
+
+    let current = NSRunningApplication::currentApplication();
+    let frontmost = NSWorkspace::sharedWorkspace().frontmostApplication()?;
+    if frontmost == current || frontmost.isTerminated() {
         return None;
     }
-    let script = vec![
-        "tell application \"System Events\"".to_string(),
-        "set frontApp to first application process whose frontmost is true".to_string(),
-        "set appName to name of frontApp".to_string(),
-        "try".to_string(),
-        "set bundleId to bundle identifier of frontApp".to_string(),
-        "on error".to_string(),
-        "set bundleId to \"\"".to_string(),
-        "end try".to_string(),
-        "return appName & linefeed & bundleId".to_string(),
-        "end tell".to_string(),
-    ];
-    let out = run_osascript(&script);
-    let mut lines = out.lines();
-    let name = lines.next().unwrap_or_default().to_string();
-    let bundle_id = lines.next().unwrap_or_default().to_string();
-    if name.is_empty() || name == "SkillSpotlight" {
+
+    let name = frontmost
+        .localizedName()
+        .map(|value| value.to_string())
+        .unwrap_or_default();
+    let bundle_id = frontmost
+        .bundleIdentifier()
+        .map(|value| value.to_string())
+        .unwrap_or_default();
+
+    if name.is_empty() && bundle_id.is_empty() {
         return None;
     }
+
     Some(FrontmostApp { name, bundle_id })
 }
 
-fn activate_frontmost_app(frontmost: &FrontmostApp) {
-    if cfg!(not(target_os = "macos")) {
-        return;
-    }
-    if !frontmost.bundle_id.is_empty() {
-        let script = vec![format!(
-            "tell application id \"{}\" to activate",
-            frontmost.bundle_id
-        )];
-        let _ = run_osascript(&script);
-    } else if !frontmost.name.is_empty() {
-        let script = vec![format!(
-            "tell application \"{}\" to activate",
-            frontmost.name
-        )];
-        let _ = run_osascript(&script);
-    }
+#[cfg(not(target_os = "macos"))]
+fn capture_frontmost_app() -> Option<FrontmostApp> {
+    None
 }
 
-fn activate_last_frontmost_app(app: &AppHandle) {
-    let last_frontmost_app = {
-        let state = app.state::<Mutex<AppData>>();
-        let data = state.lock().expect("app state poisoned");
-        data.last_frontmost_app.clone()
+#[cfg(target_os = "macos")]
+fn restore_frontmost_app(frontmost: Option<FrontmostApp>) {
+    use objc2_app_kit::{NSApplicationActivationOptions, NSRunningApplication};
+    use objc2_foundation::NSString;
+
+    let Some(frontmost) = frontmost else {
+        return;
     };
-    if let Some(frontmost) = last_frontmost_app {
-        thread::sleep(Duration::from_millis(60));
-        activate_frontmost_app(&frontmost);
+
+    if !frontmost.bundle_id.is_empty() {
+        let bundle_id = NSString::from_str(&frontmost.bundle_id);
+        let matches = NSRunningApplication::runningApplicationsWithBundleIdentifier(&bundle_id);
+        for app in matches.iter() {
+            if !app.isTerminated() {
+                app.unhide();
+                app.activateWithOptions(NSApplicationActivationOptions::ActivateAllWindows);
+                return;
+            }
+        }
     }
+
+    if frontmost.name.is_empty() {
+        return;
+    }
+
+    let script = vec![format!(
+        "tell application \"{}\" to activate",
+        frontmost.name.replace('"', "\\\"")
+    )];
+    let _ = run_osascript(&script);
 }
+
+#[cfg(not(target_os = "macos"))]
+fn restore_frontmost_app(_frontmost: Option<FrontmostApp>) {}
 
 fn read_clipboard() -> String {
     Command::new("pbpaste")
@@ -672,6 +683,38 @@ fn current_window(app: &AppHandle) -> Result<WebviewWindow, String> {
         .ok_or_else(|| "main window not found".to_string())
 }
 
+#[cfg(target_os = "macos")]
+fn configure_spotlight_panel(window: &WebviewWindow) -> Result<(), String> {
+    use objc2_app_kit::{
+        NSFloatingWindowLevel, NSWindow, NSWindowCollectionBehavior, NSWindowStyleMask,
+    };
+
+    let ns_window = window.ns_window().map_err(|err| err.to_string())?;
+    if ns_window.is_null() {
+        return Err("main window native handle is null".to_string());
+    }
+
+    unsafe {
+        let ns_window = &*(ns_window.cast::<NSWindow>());
+        ns_window.setStyleMask(
+            ns_window.styleMask()
+                | NSWindowStyleMask::UtilityWindow
+                | NSWindowStyleMask::NonactivatingPanel
+                | NSWindowStyleMask::FullSizeContentView,
+        );
+        ns_window.setCollectionBehavior(
+            ns_window.collectionBehavior()
+                | NSWindowCollectionBehavior::Transient
+                | NSWindowCollectionBehavior::FullScreenAuxiliary
+                | NSWindowCollectionBehavior::IgnoresCycle,
+        );
+        ns_window.setHidesOnDeactivate(false);
+        ns_window.setLevel(NSFloatingWindowLevel);
+    }
+
+    Ok(())
+}
+
 fn resize_for_route(app: &AppHandle, window: &WebviewWindow, route: &str) -> Result<(), String> {
     let (width, height) = if route == "settings" || route == "prefs" {
         (SETTINGS_WIDTH, SETTINGS_HEIGHT)
@@ -693,22 +736,24 @@ fn resize_for_route(app: &AppHandle, window: &WebviewWindow, route: &str) -> Res
     }
 }
 
-fn hide_window(app: &AppHandle) -> Result<(), String> {
+fn hide_window(app: &AppHandle, restore_focus: bool) -> Result<(), String> {
     let window = current_window(app)?;
     let position = window.outer_position().ok();
     window.hide().map_err(|err| err.to_string())?;
-    let state = app.state::<Mutex<AppData>>();
-    let mut data = state.lock().expect("app state poisoned");
-    data.is_visible = false;
-    if position.is_some() {
-        data.last_window_position = position;
-    }
-    Ok(())
-}
-
-fn hide_window_and_restore_focus(app: &AppHandle) -> Result<(), String> {
-    hide_window(app)?;
-    activate_last_frontmost_app(app);
+    let last_frontmost_app = {
+        let state = app.state::<Mutex<AppData>>();
+        let mut data = state.lock().expect("app state poisoned");
+        data.is_visible = false;
+        if position.is_some() {
+            data.last_window_position = position;
+        }
+        if restore_focus {
+            data.last_frontmost_app.clone()
+        } else {
+            None
+        }
+    };
+    restore_frontmost_app(last_frontmost_app);
     Ok(())
 }
 
@@ -754,7 +799,7 @@ fn get_state(state: tauri::State<'_, Mutex<AppData>>) -> StatePayload {
 
 #[tauri::command]
 fn hide(app: AppHandle) -> Result<(), String> {
-    hide_window_and_restore_focus(&app)
+    hide_window(&app, true)
 }
 
 #[tauri::command]
@@ -765,7 +810,7 @@ fn toggle_window(app: AppHandle) -> Result<(), String> {
         data.is_visible
     };
     if visible {
-        hide_window_and_restore_focus(&app)
+        hide_window(&app, true)
     } else {
         show_window(&app, "search")
     }
@@ -780,13 +825,19 @@ fn set_route(app: AppHandle, route: String) -> Result<serde_json::Value, String>
 
 #[tauri::command]
 async fn paste_entry(app: AppHandle, entry: Entry) -> Result<serde_json::Value, String> {
-    hide_window(&app)?;
+    hide_window(&app, false)?;
     let value = entry.value;
     let previous_text = read_clipboard();
     write_clipboard(&value)?;
 
     if cfg!(target_os = "macos") {
-        activate_last_frontmost_app(&app);
+        thread::sleep(Duration::from_millis(60));
+        let last_frontmost_app = {
+            let state = app.state::<Mutex<AppData>>();
+            let data = state.lock().expect("app state poisoned");
+            data.last_frontmost_app.clone()
+        };
+        restore_frontmost_app(last_frontmost_app);
         thread::sleep(Duration::from_millis(90));
         let _ = run_osascript(&[
             "tell application \"System Events\" to keystroke \"v\" using command down".to_string(),
@@ -803,15 +854,14 @@ async fn paste_entry(app: AppHandle, entry: Entry) -> Result<serde_json::Value, 
 
 #[tauri::command]
 fn copy_entry(app: AppHandle, entry: Entry) -> Result<serde_json::Value, String> {
-    hide_window(&app)?;
+    hide_window(&app, true)?;
     write_clipboard(&entry.value)?;
-    activate_last_frontmost_app(&app);
     Ok(serde_json::json!({ "ok": true }))
 }
 
 #[tauri::command]
 fn reveal_entry(app: AppHandle, entry: Entry) -> Result<(), String> {
-    hide_window(&app)?;
+    hide_window(&app, false)?;
     Command::new("open")
         .arg("-R")
         .arg(entry.value)
@@ -1089,6 +1139,11 @@ fn main() {
 
             let app_handle = app.handle().clone();
             if let Some(window) = app.get_webview_window("main") {
+                #[cfg(target_os = "macos")]
+                if let Err(error) = configure_spotlight_panel(&window) {
+                    eprintln!("failed to configure spotlight panel window: {error}");
+                }
+
                 window.on_window_event(move |event| {
                     if matches!(event, WindowEvent::Focused(false)) {
                         let app_handle = app_handle.clone();
@@ -1105,7 +1160,7 @@ fn main() {
                                 data.suppress_blur_hide
                             };
                             if should_hide && !suppress_blur_hide {
-                                let _ = hide_window(&app_handle);
+                                let _ = hide_window(&app_handle, false);
                             }
                         });
                     }
@@ -1148,7 +1203,9 @@ mod tests {
         let path = default_config_path_for_home(PathBuf::from("/Users/example"));
         assert_eq!(
             path,
-            PathBuf::from("/Users/example/Library/Application Support/skill-spotlight/config.json")
+            PathBuf::from(
+                "/Users/example/Library/Application Support/skill-spotlight/config.json"
+            )
         );
     }
 
@@ -1162,10 +1219,7 @@ mod tests {
 
         migrate_legacy_config_if_needed(&config_path, &legacy_path);
 
-        assert_eq!(
-            fs::read_to_string(&config_path).unwrap(),
-            r#"{"theme":"dark"}"#
-        );
+        assert_eq!(fs::read_to_string(&config_path).unwrap(), r#"{"theme":"dark"}"#);
         assert!(!legacy_path.exists());
     }
 

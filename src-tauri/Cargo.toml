@@ -14,6 +14,10 @@ tauri = { version = "2", features = ["tray-icon", "image-ico", "image-png", "mac
 tauri-plugin-dialog = "2"
 tauri-plugin-global-shortcut = "2"
 
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2-app-kit = { version = "0.3.2", default-features = false, features = ["NSRunningApplication", "NSWindow", "NSWorkspace"] }
+objc2-foundation = { version = "0.3.2", default-features = false, features = ["NSString"] }
+
 [profile.release]
 codegen-units = 1
 lto = true
