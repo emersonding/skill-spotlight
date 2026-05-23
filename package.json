@@ -1,8 +1,8 @@
 {
-  "name": "skillspotlight-tauri",
+  "name": "skill-spotlight",
   "version": "0.3.0",
   "private": true,
-  "description": "SkillSpotlight, rebuilt on Tauri to reduce packaged app size",
+  "description": "Spotlight-style skill and snippet launcher",
   "type": "module",
   "scripts": {
     "dev": "tauri dev",

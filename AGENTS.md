@@ -1,8 +1,8 @@
-# SkillSpotlightTauri Agent Notes
+# SkillSpotlight Agent Notes
 
 ## Basic Info
 
-SkillSpotlightTauri is a Tauri 2 desktop app with a Vite-rendered frontend and a Rust backend. It provides a Spotlight-style snippet launcher, directory-backed snippet imports, global shortcut registration, tray controls, and local JSON config storage.
+SkillSpotlight is a Tauri 2 desktop app with a Vite-rendered frontend and a Rust backend. It provides a Spotlight-style snippet launcher, directory-backed snippet imports, global shortcut registration, tray controls, and local JSON config storage.
 
 Common commands:
 

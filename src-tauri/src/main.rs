@@ -166,8 +166,28 @@ fn default_config_path_for_home(home: PathBuf) -> PathBuf {
     home
         .join("Library")
         .join("Application Support")
+        .join("skill-spotlight")
+        .join("config.json")
+}
+
+fn legacy_config_path_for_home(home: PathBuf) -> PathBuf {
+    home
+        .join("Library")
+        .join("Application Support")
         .join("skillspotlight-tauri")
         .join("config.json")
+}
+
+fn migrate_legacy_config_if_needed(config_path: &Path, legacy_path: &Path) {
+    if config_path.exists() || !legacy_path.exists() {
+        return;
+    }
+    if let Some(parent) = config_path.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    if fs::rename(legacy_path, config_path).is_err() {
+        let _ = fs::copy(legacy_path, config_path);
+    }
 }
 
 fn sanitize_config(config: Config) -> Config {
@@ -244,6 +264,10 @@ fn sanitize_config(config: Config) -> Config {
 
 fn load_config_into(data: &mut AppData) {
     data.config_path = default_config_path();
+    if env::var("SS_CONFIG_PATH").is_err() && !data.config_path.exists() {
+        let legacy_path = legacy_config_path_for_home(home_dir());
+        migrate_legacy_config_if_needed(&data.config_path, &legacy_path);
+    }
     match fs::read_to_string(&data.config_path)
         .ok()
         .and_then(|raw| serde_json::from_str::<Config>(&raw).ok())
@@ -1097,14 +1121,28 @@ mod tests {
         assert_eq!(
             path,
             PathBuf::from(
-                "/Users/example/Library/Application Support/skillspotlight-tauri/config.json"
+                "/Users/example/Library/Application Support/skill-spotlight/config.json"
             )
         );
     }
 
     #[test]
+    fn migrates_legacy_tauri_config_directory() {
+        let dir = temp_dir("skill-spotlight-config-migration");
+        let config_path = dir.join("Application Support/skill-spotlight/config.json");
+        let legacy_path = dir.join("Application Support/skillspotlight-tauri/config.json");
+        fs::create_dir_all(legacy_path.parent().unwrap()).unwrap();
+        fs::write(&legacy_path, r#"{"theme":"dark"}"#).unwrap();
+
+        migrate_legacy_config_if_needed(&config_path, &legacy_path);
+
+        assert_eq!(fs::read_to_string(&config_path).unwrap(), r#"{"theme":"dark"}"#);
+        assert!(!legacy_path.exists());
+    }
+
+    #[test]
     fn directory_source_allows_missing_id_from_import() {
-        let dir = temp_dir("skillspotlight-tauri-missing-id");
+        let dir = temp_dir("skill-spotlight-missing-id");
         fs::create_dir_all(dir.join("skill-a")).unwrap();
         let source: DirectorySource = serde_json::from_value(serde_json::json!({
             "path": dir.to_string_lossy(),
@@ -1124,7 +1162,7 @@ mod tests {
 
     #[test]
     fn directory_source_generates_prefixed_entries() {
-        let dir = temp_dir("skillspotlight-tauri-source");
+        let dir = temp_dir("skill-spotlight-source");
         fs::create_dir_all(dir.join("skill-a")).unwrap();
         fs::write(dir.join("note.md"), "hello").unwrap();
 
@@ -1148,7 +1186,7 @@ mod tests {
 
     #[test]
     fn removing_source_removes_generated_entries() {
-        let dir = temp_dir("skillspotlight-tauri-remove");
+        let dir = temp_dir("skill-spotlight-remove");
         fs::create_dir_all(dir.join("skill-a")).unwrap();
         let config = upsert_directory_source(
             &Config::default(),
@@ -1166,7 +1204,7 @@ mod tests {
 
     #[test]
     fn source_prefix_updates_generated_keys() {
-        let dir = temp_dir("skillspotlight-tauri-prefix");
+        let dir = temp_dir("skill-spotlight-prefix");
         fs::create_dir_all(dir.join("skill-a")).unwrap();
         let config = upsert_directory_source(
             &Config::default(),
@@ -1191,7 +1229,7 @@ mod tests {
 
     #[test]
     fn replacement_source_keeps_direct_entries() {
-        let dir = temp_dir("skillspotlight-tauri-direct");
+        let dir = temp_dir("skill-spotlight-direct");
         fs::create_dir_all(dir.join("skill-a")).unwrap();
         let config = Config {
             entries: vec![Entry {

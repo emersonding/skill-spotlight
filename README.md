@@ -108,7 +108,7 @@ src-tauri/target/release/bundle/
 SkillSpotlight stores its default config at:
 
 ```text
-~/Library/Application Support/skillspotlight-tauri/config.json
+~/Library/Application Support/skill-spotlight/config.json
 ```
 
 Use `SS_CONFIG_PATH` for isolated development or testing.

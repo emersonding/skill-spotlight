@@ -16,7 +16,7 @@ async function installE2eApi() {
     effectiveEntries: [],
     sourceGroups: [],
     hotkeyAccelerator: 'Alt+Space',
-    configPath: fixture.configPath || '/tmp/skillspotlight-tauri-e2e/config.json',
+    configPath: fixture.configPath || '/tmp/skill-spotlight-e2e/config.json',
   };
 
   function clone(value) {
