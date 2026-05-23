@@ -206,14 +206,6 @@ function iconSvg(id) {
   return `<svg aria-hidden="true"><use href="#i-${id}"/></svg>`;
 }
 
-function entrySourceLabel(entry) {
-  if (entry.kind === 'directory' || entry.sourceId) {
-    const prefix = String(entry.key || '').split(':')[0];
-    return { label: prefix ? `${prefix}:` : 'directory', cls: 'dir' };
-  }
-  return { label: 'direct', cls: 'snip' };
-}
-
 function applyTheme() {
   const theme = state.config.theme === 'dark' ? 'dark' : 'light';
   document.documentElement.dataset.theme = theme;
@@ -252,14 +244,12 @@ function renderResults() {
   results.forEach((entry, index) => {
     const row = document.createElement('button');
     row.className = `result-row${index === selectedIndex ? ' selected' : ''}`;
-    const src = entrySourceLabel(entry);
     const showSpark = !query && index === 0; // gentle "best match" hint when idle
 
     row.innerHTML = `
       <span class="row-icon">${iconSvg(resolveEntryIcon(entry))}</span>
       <span class="key">${highlight(entry.key, hi)}</span>
-      <span class="value">${highlight(middleTruncate(entry.value), hi)}</span>
-      <span class="kind">${escapeHtml(src.label)}</span>
+      <span class="value">${highlight(middleTruncate(entry.value, 140), hi)}</span>
       <span class="arrow">↵</span>
       ${showSpark ? '<span class="spark" aria-hidden="true"></span>' : ''}
     `;
