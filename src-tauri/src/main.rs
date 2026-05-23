@@ -466,14 +466,17 @@ fn update_directory_source(config: &Config, source: DirectorySource) -> Config {
         expanded: source.expanded,
     };
 
-    let mut recent_sources = vec![next_source.clone()];
-    recent_sources.extend(
-        config
-            .recent_sources
-            .iter()
-            .filter(|item| item.id != next_source.id)
-            .cloned(),
-    );
+    let recent_sources = config
+        .recent_sources
+        .iter()
+        .map(|item| {
+            if item.id == next_source.id {
+                next_source.clone()
+            } else {
+                item.clone()
+            }
+        })
+        .collect();
 
     let entries = config
         .entries
@@ -1258,5 +1261,44 @@ mod tests {
             .collect();
         assert!(keys.contains("manual"));
         assert!(keys.contains("codex:skill-a"));
+    }
+
+    #[test]
+    fn updating_source_preserves_recent_source_order() {
+        let config = Config {
+            recent_sources: vec![
+                DirectorySource {
+                    id: "first".to_string(),
+                    path: "/tmp/first".to_string(),
+                    last_prefix: "first:".to_string(),
+                    expanded: true,
+                },
+                DirectorySource {
+                    id: "second".to_string(),
+                    path: "/tmp/second".to_string(),
+                    last_prefix: "second:".to_string(),
+                    expanded: true,
+                },
+            ],
+            ..Config::default()
+        };
+
+        let config = update_directory_source(
+            &config,
+            DirectorySource {
+                id: "second".to_string(),
+                path: "/tmp/second".to_string(),
+                last_prefix: "second:".to_string(),
+                expanded: false,
+            },
+        );
+
+        let ids: Vec<&str> = config
+            .recent_sources
+            .iter()
+            .map(|source| source.id.as_str())
+            .collect();
+        assert_eq!(ids, vec!["first", "second"]);
+        assert!(!config.recent_sources[1].expanded);
     }
 }

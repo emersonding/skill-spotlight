@@ -910,6 +910,14 @@ p {
   display: block;
 }
 
+.source-children .item {
+  padding-left: 58px;
+}
+
+.source-children .item-empty {
+  padding-left: 58px;
+}
+
 .source-group.collapsed .source-children {
   display: none;
 }

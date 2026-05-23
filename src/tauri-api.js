@@ -139,10 +139,7 @@ async function installE2eApi() {
     },
     saveSource: async (source) => {
       recordCall('saveSource', { source });
-      state.config.recentSources = [
-        source,
-        ...state.config.recentSources.filter((item) => item.id !== source.id),
-      ];
+      state.config.recentSources = state.config.recentSources.map((item) => (item.id === source.id ? source : item));
       state.config.entries = state.config.entries.map((entry) => {
         if (entry.kind !== 'directory' || entry.sourceId !== source.id) return entry;
         return { ...entry, key: `${normalizePrefix(source.lastPrefix)}${entry.name}`, sourcePath: source.path };
