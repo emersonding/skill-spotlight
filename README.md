@@ -1,22 +1,25 @@
 # SkillSpotlight
 
-Call skills explicitly, and only when you need them.
+Use skills explicitly, anywhere you can type.
 
-SkillSpotlight is a macOS snippet launcher for skills, prompts, commands, and reusable text. Open it with a global shortcut, type a few characters, then paste, copy, or reveal the matching snippet without leaving your current workflow.
+SkillSpotlight is a macOS snippet launcher and universal skill manager for skills, prompts, commands, and reusable text. Collect skills from Claude Code, Codex, team repositories, personal prompt folders, and other agent platforms into one searchable place. Open it with a global shortcut, type a few characters, then paste, copy, or reveal the matching entry without leaving your current workflow.
+
+Add a direct snippet like `foo` -> `bar`, search for `foo`, press `Enter`, and SkillSpotlight inserts `bar` into the focused window. Or import a directory, such as `~/.claude/skills`, and SkillSpotlight turns the files inside it into searchable entries. Optional prefixes like `claude:` or `codex:` make each source clear in results.
 
 ![SkillSpotlight search results for clean-code](assets/readme/spotlight-search-clean-code.png)
 
 ## Why This App
 
-Skills are most useful when invocation is intentional. Many agent skills are expensive, slow, opinionated, or disruptive when they trigger automatically. For heavy workflows, telling Claude, Codex, or another agent in `AGENTS.md` not to auto-invoke a skill is not always reliable enough. The cleaner pattern is to keep the skill available everywhere, but call it explicitly at the moment you want it.
+Many skills are most useful when invocation is intentional. They can be expensive, slow, opinionated, or disruptive outside the workflow they were designed for. A deep-research skill, for example, can be valuable when you explicitly want deep research, but noisy when an agent reaches for it during a quick search or lightweight coding task.
 
-That gets harder when you use multiple agents. Today, a common workaround is to symlink or copy the same skill directories between tools. SkillSpotlight gives you a more universal control point: index your skill files once, search them quickly, and inject the exact skill prompt into any app, editor, chat, or new agent platform with one shortcut.
+Claude Code and Codex have improved this by adding ways to control implicit skill triggering, but that configuration does not exist in every agent system. Even when it does, managing the same skills across platforms is still tedious. A common workaround is to symlink or copy skill directories between tools. SkillSpotlight gives you a universal control point: collect your skill libraries once, search them quickly, and explicitly inject the exact skill prompt into any system, including AI agent CLIs, desktop apps, editors, terminals, chat windows, or new agent platforms.
 
 ## What It Does
 
 - Opens a Spotlight-style launcher from a global shortcut.
 - Searches direct snippets and directory-backed snippets in the same result list.
-- Imports Claude, Codex, team, or personal skill directories with prefixes like `claude:` and `codex:` so each snippet's source is visible in its name.
+- Acts as a universal skill manager for Claude Code, Codex, team, personal, and other platform skill libraries.
+- Imports skill directories with prefixes like `claude:`, `codex:`, and `team:` so each snippet's source is visible in its name.
 - Supports fuzzy matching, highlighted matches, keyboard navigation, and mouse selection.
 - Pastes the selected snippet, copies it to the clipboard, or reveals the source file.
 - Provides preferences for snippets, directory sources, theme, shortcut, and storage.
@@ -31,7 +34,7 @@ That gets harder when you use multiple agents. Today, a common workaround is to 
 6. Press `Cmd+Enter` to reveal the source file in Finder.
 7. Press `Esc` to close the launcher.
 
-The launcher searches across direct snippets and imported directories. Directory snippets use their configured prefix, such as `codex:forum` or `general:clean-code`, so related snippets stay grouped while still being searchable by the final filename.
+The launcher searches across direct snippets and imported directories. Directory snippets use their configured prefix, such as `claude:review`, `codex:forum`, or `general:clean-code`, so related snippets stay grouped while still being searchable by the final filename. Because SkillSpotlight pastes plain text into the active app, the same managed skill can be used anywhere you can type: an AI agent CLI, a desktop chat app, a browser, a code editor, or a terminal.
 
 ![SkillSpotlight search results for forum](assets/readme/spotlight-search-forum.png)
 
@@ -41,7 +44,7 @@ SkillSpotlight supports two kinds of snippets.
 
 Direct snippets are best for short reusable text that you manage inside the app. Open Preferences, go to Snippets, enter a key and value, then add it. For example, a key like `email-signoff` can paste your preferred sign-off, or `review-note` can paste a common code review comment.
 
-Directory snippets are best for existing skill libraries or prompt folders. Add a directory, choose a prefix, and each file becomes a searchable snippet.
+Directory snippets are best for existing skill libraries or prompt folders. Add directories from Claude Code, Codex, other AI agent platforms, team repositories, or personal collections; choose a prefix for each source; and each supported file becomes a searchable snippet.
 
 ## Preferences
 
