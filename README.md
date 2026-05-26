@@ -21,9 +21,9 @@ xattr -dr com.apple.quarantine /Applications/SkillSpotlight.app
 
 ## macOS Permissions
 
-SkillSpotlight only asks for system access when a feature needs it:
+SkillSpotlight asks for system access when a feature needs it:
 
-- Accessibility: used by paste mode to return focus to the previous app and send `Cmd+V`. Copy mode still works without it.
+- Accessibility: requested on app startup when missing. Paste mode needs it to return focus to the previous app and send `Cmd+V`; without it, pressing `Enter` or clicking a search result may copy the snippet to the clipboard but fail to insert it into the target app. Copy mode still works without it.
 - Automation/System Events: macOS may ask for this when SkillSpotlight activates the previous app or asks System Events to paste.
 - Files and Folders: used when you import a skill directory, reveal a source file, or reveal the config file. SkillSpotlight reads the directories you choose and stores config locally.
 - Clipboard: used to copy snippets and to paste by temporarily placing the selected snippet on the clipboard.

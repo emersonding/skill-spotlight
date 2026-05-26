@@ -165,16 +165,14 @@ fn default_config_path() -> PathBuf {
 }
 
 fn default_config_path_for_home(home: PathBuf) -> PathBuf {
-    home
-        .join("Library")
+    home.join("Library")
         .join("Application Support")
         .join("skill-spotlight")
         .join("config.json")
 }
 
 fn legacy_config_path_for_home(home: PathBuf) -> PathBuf {
-    home
-        .join("Library")
+    home.join("Library")
         .join("Application Support")
         .join("skillspotlight-tauri")
         .join("config.json")
@@ -588,6 +586,37 @@ fn run_osascript(lines: &[String]) -> String {
         }
         _ => String::new(),
     }
+}
+
+#[cfg(target_os = "macos")]
+#[link(name = "ApplicationServices", kind = "framework")]
+extern "C" {
+    static kAXTrustedCheckOptionPrompt: core_foundation::string::CFStringRef;
+    fn AXIsProcessTrustedWithOptions(options: core_foundation::dictionary::CFDictionaryRef)
+        -> bool;
+}
+
+#[cfg(target_os = "macos")]
+fn request_accessibility_permission() -> bool {
+    use core_foundation::{
+        base::TCFType, boolean::CFBoolean, dictionary::CFDictionary, string::CFString,
+    };
+
+    let prompt_key = unsafe { CFString::wrap_under_get_rule(kAXTrustedCheckOptionPrompt) };
+    let prompt_value = CFBoolean::true_value();
+    let options = CFDictionary::from_CFType_pairs(&[(prompt_key, prompt_value)]);
+
+    unsafe { AXIsProcessTrustedWithOptions(options.as_concrete_TypeRef()) }
+}
+
+#[cfg(target_os = "macos")]
+fn maybe_request_accessibility_permission_on_start() {
+    thread::spawn(|| {
+        thread::sleep(Duration::from_millis(700));
+        if !request_accessibility_permission() {
+            eprintln!("accessibility permission is required for paste mode");
+        }
+    });
 }
 
 #[cfg(target_os = "macos")]
@@ -1168,6 +1197,8 @@ fn main() {
             }
 
             maybe_open_settings_on_first_run(app.handle().clone());
+            #[cfg(target_os = "macos")]
+            maybe_request_accessibility_permission_on_start();
             Ok(())
         })
         .run(tauri::generate_context!())
@@ -1203,9 +1234,7 @@ mod tests {
         let path = default_config_path_for_home(PathBuf::from("/Users/example"));
         assert_eq!(
             path,
-            PathBuf::from(
-                "/Users/example/Library/Application Support/skill-spotlight/config.json"
-            )
+            PathBuf::from("/Users/example/Library/Application Support/skill-spotlight/config.json")
         );
     }
 
@@ -1219,7 +1248,10 @@ mod tests {
 
         migrate_legacy_config_if_needed(&config_path, &legacy_path);
 
-        assert_eq!(fs::read_to_string(&config_path).unwrap(), r#"{"theme":"dark"}"#);
+        assert_eq!(
+            fs::read_to_string(&config_path).unwrap(),
+            r#"{"theme":"dark"}"#
+        );
         assert!(!legacy_path.exists());
     }
 
